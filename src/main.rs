@@ -1,13 +1,15 @@
 use std::fs::File;
-use std::io;
+use std::{fs, io};
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
-use zip::write::FileOptions;
+use zip::write::{ExtendedFileOptions, FileOptions, SimpleFileOptions};
 use zip::{CompressionMethod, ZipWriter};
 
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
+
+    zip_folder("modpacks/Base".to_string(),"temp/zip".to_string(),"Base.zip".to_string()).unwrap();
 
     for stream in listener.incoming() {
         let stream = stream.unwrap();
@@ -32,34 +34,32 @@ fn handle_connection(mut stream: TcpStream) {
 }
 
 fn zip_folder(folder_path:String,output_path:String,filename:String) -> Result<(), Box<dyn std::error::Error>> {
-    let zip_file_path = Path::new(&folder_path);
-    let zip_file = File::create(&(output_path+ &*filename))?;
+
+    let zip_file_path = Path::new(&output_path);
+    let zip_file = File::create(Path::new(&output_path).join(filename))?;
 
     let mut zip = ZipWriter::new(zip_file);
 
-    // Define the files you want to compress.
-    let files_to_compress: Vec<PathBuf> = vec![
-        PathBuf::from("exampleImage.png"),
-        PathBuf::from(".gitignore"),
-        // Add more files as needed
-    ];
+
+    let paths = fs::read_dir(&folder_path)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .collect::<Vec<_>>();
 
     // Set compression options (e.g., compression method)
-    let options = FileOptions::default()
+    let options:FileOptions<'_,()> = FileOptions::default()
         .compression_method(CompressionMethod::DEFLATE);
 
     // Iterate through the files and add them to the ZIP archive.
-    for file_path in &files_to_compress {
+    for file_path in &paths {
 
-        let file = File::open(file_path)?;
         let file_name = file_path.file_name().unwrap().to_str().unwrap();
 
         // Adding the file to the ZIP archive.
         zip.start_file(file_name, options)?;
 
-        let mut buffer = Vec::new();
-        io::copy(&mut file.take(usize::MAX), &mut buffer)?;
-
+        let buffer:Vec<u8> = fs::read(file_path)?;
         zip.write_all(&buffer)?;
     }
 
