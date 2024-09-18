@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::{fs, io};
+use std::error::Error;
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
@@ -8,7 +9,8 @@ use zip::write::{ExtendedFileOptions, FileOptions, SimpleFileOptions};
 use zip::{CompressionMethod, ZipWriter};
 
 pub const MODPACK_FOLDER:&str = "modpacks";
-pub const ZIP_FOLDER:&str = "temp/zip";
+pub const ZIP_TEMP_FOLDER:&str = "temp/zip";
+pub const ZIP_NAME:&str = "zip.zip";
 
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
@@ -34,21 +36,47 @@ fn handle_connection(mut stream: TcpStream) {
 
     let modpack_id = uri.replace("/","");
 
-    if !check_modpack_folder(modpack_id){
-        respond_to_request(&stream,"MODPACK NOT FOUND".to_string());
-        return;
+
+    let path = match check_modpack_folder(modpack_id) {
+        Ok(path) => path,
+        Err(_) => {
+            respond_to_request(&stream,"PACK NOT FOUND".to_string());
+            return;
+        }
+    };
+    
+    match zip_folder(path,ZIP_TEMP_FOLDER.to_string(),ZIP_NAME.to_string()) {
+        Ok(_) => {}
+        Err(err) => {
+            respond_to_request(&stream,format!("ERROR WITH ZIP: {0}",err.to_string()))
+        }
     }
 
+    let zip_path = Path::new(ZIP_TEMP_FOLDER).join(ZIP_NAME);
+    let binding = fs::read(zip_path).unwrap();
+    let zip_bytes = binding.as_slice();
+
+    respond_to_request(
+        &stream,
+        std::str::from_utf8(zip_bytes).unwrap().to_string()
+    );
 }
+
 
 fn respond_to_request(mut stream: &TcpStream,content:String){
     let response = format!("HTTP/1.1 200 OK\r\n\r\n{content}");
 
+    println!("{}", response);
+
     stream.write_all(response.as_bytes()).unwrap();
 }
 
-fn check_modpack_folder(modpack:String) -> bool{
-    Path::new(MODPACK_FOLDER).join(&modpack).exists()
+fn check_modpack_folder(modpack:String) -> Result<String,()>{
+    let path = Path::new(MODPACK_FOLDER).join(&modpack);
+    if path.exists() {
+        return Ok(path.to_str().unwrap().to_string());
+    }
+    return Err(());
 }
 
 fn zip_folder(folder_path:String,output_path:String,filename:String) -> Result<(), Box<dyn std::error::Error>> {
