@@ -56,12 +56,19 @@ fn handle_connection(mut stream: TcpStream) {
     let binding = fs::read(zip_path).unwrap();
     let zip_bytes = binding.as_slice();
 
-    respond_to_request(
-        &stream,
-        std::str::from_utf8(zip_bytes).unwrap().to_string()
-    );
+    respond_bytes(&stream,zip_bytes)
 }
 
+fn respond_bytes(mut stream:&TcpStream,content:&[u8]){
+    let header = format!("HTTP/1.0 200 OK\r\nContent-Type: application/zip\r\nContent-Length: {}\r\n\r\n",
+                           content.len(),
+    );
+
+    let header_bytes = header.as_bytes();
+    stream.write_all(header_bytes).unwrap();
+    stream.write_all(content).unwrap();
+    stream.flush().unwrap();
+}
 
 fn respond_to_request(mut stream: &TcpStream,content:String){
     let response = format!("HTTP/1.1 200 OK\r\n\r\n{content}");
@@ -69,6 +76,7 @@ fn respond_to_request(mut stream: &TcpStream,content:String){
     println!("{}", response);
 
     stream.write_all(response.as_bytes()).unwrap();
+    stream.flush().unwrap();
 }
 
 fn check_modpack_folder(modpack:String) -> Result<String,()>{
