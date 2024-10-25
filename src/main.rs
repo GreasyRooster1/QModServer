@@ -65,9 +65,24 @@ fn respond_bytes(mut stream:&TcpStream,content:&[u8]){
     );
 
     let header_bytes = header.as_bytes();
-    stream.write_all(header_bytes).unwrap();
-    stream.write_all(content).unwrap();
-    stream.flush().unwrap();
+    match stream.write_all(header_bytes).unwrap(){
+        Ok(..)=>{}
+        Err(error)=>{
+            println!("Error occurred on stream.write: {error}");
+        }
+    }
+    match stream.write_all(content){
+        Ok(..)=>{}
+        Err(error)=>{
+            println!("Error occurred on stream.write: {error}");
+        }
+    }
+    match stream.flush(){
+        Ok(..)=>{}
+        Err(error)=>{
+            println!("Error occurred on stream.flush: {error}");
+        }
+    }
 }
 
 fn respond_to_request(mut stream: &TcpStream,content:String){
