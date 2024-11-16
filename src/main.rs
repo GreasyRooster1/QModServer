@@ -7,18 +7,32 @@ use std::path::{Path, PathBuf};
 use std::string::ToString;
 use zip::write::{ExtendedFileOptions, FileOptions, SimpleFileOptions};
 use zip::{CompressionMethod, ZipWriter};
+use QModServer::ThreadPool;
 
 pub const MODPACK_FOLDER:&str = "modpacks";
 pub const ZIP_TEMP_FOLDER:&str = "temp/zip";
 pub const ZIP_NAME:&str = "zip.zip";
 
-fn main() {
+pub const THREAD_POOL_SIZE:usize = 32;
+
+#[tokio::main]
+async fn main() {
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
+    let pool = ThreadPool::new(THREAD_POOL_SIZE);
 
     for stream in listener.incoming() {
-        let stream = stream.unwrap();
-
-        handle_connection(stream);
+        let stream = match stream {
+            Ok(_) => {
+                stream.unwrap()
+            }
+            Err(_) => {
+                println!("error occurred when unwrapping stream");
+                continue;
+            }
+        };
+        pool.execute(|| {
+            handle_connection(stream);
+        });
     }
 }
 
@@ -34,29 +48,42 @@ fn handle_connection(mut stream: TcpStream) {
     let end = get_line.len()-9;
     let uri = &get_line[4..end];
 
-    let modpack_id = uri.replace("/","");
+    let chunks = uri.split('/').collect::<Vec<&str>>();
 
+    println!("{:?}", chunks);
 
-    let path = match check_modpack_folder(modpack_id) {
-        Ok(path) => path,
+    if chunks.len() < 3 {
+        println!("uri malformed");
+        return;
+    }
+
+    let modpack_id = chunks[1];
+    let file_chunk = chunks[2];
+
+    let modpack_path = match check_modpack_folder(modpack_id.to_string()) {
+        Ok(path) => PathBuf::from(path),
         Err(_) => {
             respond_to_request(&stream,"PACK NOT FOUND".to_string());
             return;
         }
     };
-    
-    match zip_folder(path,ZIP_TEMP_FOLDER.to_string(),ZIP_NAME.to_string()) {
-        Ok(_) => {}
-        Err(err) => {
-            respond_to_request(&stream,format!("ERROR WITH ZIP: {0}",err.to_string()))
+
+    if file_chunk=="metadata"{
+        let paths = fs::read_dir(modpack_path).unwrap();
+        let mut response_vec = vec![];
+        for path in paths {
+            response_vec.push(path.unwrap().file_name().to_str().unwrap().to_string());
         }
+        respond_to_request(&stream,response_vec.join("\n"));
+        return;
     }
 
-    let zip_path = Path::new(ZIP_TEMP_FOLDER).join(ZIP_NAME);
-    let binding = fs::read(zip_path).unwrap();
-    let zip_bytes = binding.as_slice();
+    let jar_path = modpack_path.join(file_chunk);
+    println!("jar_path: {:?}", jar_path);
+    let binding = fs::read(jar_path).unwrap();
+    let jar_bytes = binding.as_slice();
 
-    respond_bytes(&stream,zip_bytes)
+    respond_bytes(&stream,jar_bytes)
 }
 
 fn respond_bytes(mut stream:&TcpStream,content:&[u8]){
@@ -85,41 +112,4 @@ fn check_modpack_folder(modpack:String) -> Result<String,()>{
         return Ok(path.to_str().unwrap().to_string());
     }
     return Err(());
-}
-
-fn zip_folder(folder_path:String,output_path:String,filename:String) -> Result<(), Box<dyn std::error::Error>> {
-
-    let zip_file_path = Path::new(&output_path);
-    let zip_file = File::create(Path::new(&output_path).join(filename))?;
-
-    let mut zip = ZipWriter::new(zip_file);
-
-
-    let paths = fs::read_dir(&folder_path)
-        .unwrap()
-        .filter_map(|e| e.ok())
-        .map(|e| e.path())
-        .collect::<Vec<_>>();
-
-    // Set compression options (e.g., compression method)
-    let options:FileOptions<'_,()> = FileOptions::default()
-        .compression_method(CompressionMethod::DEFLATE);
-
-    // Iterate through the files and add them to the ZIP archive.
-    for file_path in &paths {
-
-        let file_name = file_path.file_name().unwrap().to_str().unwrap();
-
-        // Adding the file to the ZIP archive.
-        zip.start_file(file_name, options)?;
-
-        let buffer:Vec<u8> = fs::read(file_path)?;
-        zip.write_all(&buffer)?;
-    }
-
-    zip.finish()?;
-
-    println!("Files compressed successfully to {:?}", zip_file_path);
-
-    Ok(())
 }
