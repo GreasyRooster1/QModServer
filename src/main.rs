@@ -8,8 +8,6 @@ use std::string::ToString;
 use zip::write::{ExtendedFileOptions, FileOptions, SimpleFileOptions};
 use zip::{CompressionMethod, ZipWriter};
 use QModServer::ThreadPool;
-use url::Url;
-
 pub const MODPACK_FOLDER:&str = "modpacks";
 pub const ZIP_TEMP_FOLDER:&str = "temp/zip";
 pub const ZIP_NAME:&str = "zip.zip";
@@ -47,7 +45,7 @@ fn handle_connection(mut stream: TcpStream) {
 
     let get_line = http_request[0].clone();
     let end = get_line.len()-9;
-    let uri = Url::parse(&get_line[4..end]);
+    let uri: String = urlencoding::decode(&get_line[4..end]).unwrap().parse().unwrap();
 
     let chunks = uri.split('/').collect::<Vec<&str>>();
 
@@ -93,20 +91,20 @@ fn respond_bytes(mut stream:&TcpStream,content:&[u8]){
     );
 
     let header_bytes = header.as_bytes();
-    match stream.write_all(header_bytes).unwrap(){
-        Ok(..)=>{}
+    match stream.write_all(header_bytes){
+        Ok(_)=>{}
         Err(error)=>{
             println!("Error occurred on stream.write: {error}");
         }
     }
     match stream.write_all(content){
-        Ok(..)=>{}
+        Ok(_)=>{}
         Err(error)=>{
             println!("Error occurred on stream.write: {error}");
         }
     }
     match stream.flush(){
-        Ok(..)=>{}
+        Ok(_)=>{}
         Err(error)=>{
             println!("Error occurred on stream.flush: {error}");
         }
