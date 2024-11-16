@@ -8,6 +8,7 @@ use std::string::ToString;
 use zip::write::{ExtendedFileOptions, FileOptions, SimpleFileOptions};
 use zip::{CompressionMethod, ZipWriter};
 use QModServer::ThreadPool;
+use url::Url;
 
 pub const MODPACK_FOLDER:&str = "modpacks";
 pub const ZIP_TEMP_FOLDER:&str = "temp/zip";
@@ -46,7 +47,7 @@ fn handle_connection(mut stream: TcpStream) {
 
     let get_line = http_request[0].clone();
     let end = get_line.len()-9;
-    let uri = &get_line[4..end];
+    let uri = Url::parse(&get_line[4..end]);
 
     let chunks = uri.split('/').collect::<Vec<&str>>();
 
