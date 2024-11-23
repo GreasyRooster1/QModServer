@@ -4,13 +4,15 @@ use std::{
 };
 use crate::log::*;
 use std::fmt::format;
+use std::sync::{Condvar};
 
 pub struct ThreadPool {
     workers: Vec<Worker>,
     sender: Option<mpsc::Sender<Job>>,
+    console_context: ConsoleContext,
 }
 
-type Job = (Box<dyn FnOnce() + Send + 'static>,usize);
+type Job = (Box<dyn FnOnce(i32,&mut ConsoleContext) + Send + 'static>,usize);
 
 impl ThreadPool {
     pub fn new(size: usize) -> ThreadPool {
@@ -21,20 +23,23 @@ impl ThreadPool {
         let receiver = Arc::new(Mutex::new(receiver));
         let mut workers = Vec::with_capacity(size);
 
+        let mut con_ctx = &mut create_console();
+
         for id in 0..size {
-            workers.push(Worker::new(id, Arc::clone(&receiver)));
+            workers.push(Worker::new(id, Arc::clone(&receiver),&mut con_ctx));
         }
 
         ThreadPool {
             workers,
             sender: Some(sender),
+            console_context:con_ctx
         }
     }
     pub fn execute<F>(&self, f: F)
     where
-        F: FnOnce() + Send + 'static,
+        F: FnOnce(i32,&mut ConsoleContext) + Send + 'static,
     {
-        let job = (Box::new(f) as Box<dyn FnOnce() + Send>,0usize);
+        let job = (Box::new(f) as Box<dyn FnOnce(i32,&mut ConsoleContext) + Send>,0usize);
         self.sender.as_ref().unwrap().send(job).unwrap();
     }
 }
@@ -58,7 +63,7 @@ struct Worker {
 }
 
 impl Worker {
-    fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Job>>>) -> Worker {
+    fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Job>>>, console_context: &mut ConsoleContext) -> Worker {
         let name = format!("worker-{id}");
         let builder = thread::Builder::new().name(name);
 
@@ -70,7 +75,7 @@ impl Worker {
                     println!("worker {id} got a job, executing...");
 
                     let (func,id)=job;
-                    func();
+                    func((id as i32).clone(),console_context);
                 }
                 Err(_) => {
                     println!("worker {id} disconnected, closing thread");
@@ -88,6 +93,6 @@ impl Worker {
         self.id
     }
     pub fn set_status(&self,status:i32,ctx:&mut ConsoleContext){
-        ctx.workers_status.get_mut(self.id).unwrap() = &mut status.clone();
+      ctx.workers_status[self.id]= status;
     }
 }

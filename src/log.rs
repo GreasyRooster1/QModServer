@@ -20,6 +20,7 @@ impl LogLevel{
     }
 }
 
+#[derive(Clone)]
 pub struct ConsoleContext{
     pub content:Vec<String>,
     pub header:String,

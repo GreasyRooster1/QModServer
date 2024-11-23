@@ -22,9 +22,12 @@ use crate::log::*;
 
 #[tokio::main]
 async fn main() {
+    wrapper().await;
+}
+
+async fn wrapper()->!{
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
     let pool = ThreadPool::new(THREAD_POOL_SIZE);
-    let mut con_ctx = create_console();
 
     for stream in listener.incoming() {
         let stream = match stream {
@@ -36,10 +39,11 @@ async fn main() {
                 continue;
             }
         };
-        pool.execute(|worker| {
-            handle_connection(stream,&mut con_ctx);
+        pool.execute(move |worker,con_ctx| {
+            handle_connection(stream,con_ctx);
         });
     }
+    loop{}
 }
 
 fn handle_connection(mut stream: TcpStream, con_ctx: &mut ConsoleContext) {
