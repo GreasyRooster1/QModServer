@@ -1,4 +1,4 @@
-
+mod thread;
 
 use std::fs::File;
 use std::{fs, io};
@@ -9,8 +9,7 @@ use std::path::{Path, PathBuf};
 use std::string::ToString;
 use zip::write::{ExtendedFileOptions, FileOptions, SimpleFileOptions};
 use zip::{CompressionMethod, ZipWriter};
-use QModServer::*;
-
+use crate::thread::*;
 
 pub const MODPACK_FOLDER:&str = "modpacks";
 pub const ZIP_TEMP_FOLDER:&str = "temp/zip";
