@@ -1,3 +1,5 @@
+mod log;
+
 use std::fs::File;
 use std::{fs, io};
 use std::error::Error;
@@ -7,7 +9,9 @@ use std::path::{Path, PathBuf};
 use std::string::ToString;
 use zip::write::{ExtendedFileOptions, FileOptions, SimpleFileOptions};
 use zip::{CompressionMethod, ZipWriter};
-use QModServer::ThreadPool;
+use QModServer::*;
+use crate::log::*;
+
 pub const MODPACK_FOLDER:&str = "modpacks";
 pub const ZIP_TEMP_FOLDER:&str = "temp/zip";
 pub const ZIP_NAME:&str = "zip.zip";
@@ -18,6 +22,7 @@ pub const THREAD_POOL_SIZE:usize = 32;
 async fn main() {
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
     let pool = ThreadPool::new(THREAD_POOL_SIZE);
+    let mut con_ctx = create_console();
 
     for stream in listener.incoming() {
         let stream = match stream {
@@ -30,12 +35,12 @@ async fn main() {
             }
         };
         pool.execute(|| {
-            handle_connection(stream);
+            handle_connection(stream,&mut con_ctx);
         });
     }
 }
 
-fn handle_connection(mut stream: TcpStream) {
+fn handle_connection(mut stream: TcpStream, con_ctx: &mut ConsoleContext) {
     let buf_reader = BufReader::new(&mut stream);
     let http_request: Vec<_> = buf_reader
     .lines()
