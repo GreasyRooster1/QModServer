@@ -1,7 +1,9 @@
+mod log;
 use std::{
     sync::{mpsc, Arc, Mutex},
     thread,
 };
+use crate::log::*;
 use std::fmt::format;
 
 pub struct ThreadPool {
@@ -85,5 +87,8 @@ impl Worker {
     }
     pub fn id(&self)->usize{
         self.id
+    }
+    pub fn set_status(&self,status:i32,ctx:&mut ConsoleContext){
+        ctx.workers_status.get_mut(self.id).unwrap() = &mut status.clone();
     }
 }

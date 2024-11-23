@@ -1,4 +1,4 @@
-mod log;
+
 
 use std::fs::File;
 use std::{fs, io};
@@ -10,13 +10,16 @@ use std::string::ToString;
 use zip::write::{ExtendedFileOptions, FileOptions, SimpleFileOptions};
 use zip::{CompressionMethod, ZipWriter};
 use QModServer::*;
-use crate::log::*;
+
 
 pub const MODPACK_FOLDER:&str = "modpacks";
 pub const ZIP_TEMP_FOLDER:&str = "temp/zip";
 pub const ZIP_NAME:&str = "zip.zip";
-
 pub const THREAD_POOL_SIZE:usize = 32;
+
+mod log;
+use crate::log::*;
+
 
 #[tokio::main]
 async fn main() {
@@ -34,13 +37,15 @@ async fn main() {
                 continue;
             }
         };
-        pool.execute(|| {
+        pool.execute(|worker| {
             handle_connection(stream,&mut con_ctx);
         });
     }
 }
 
 fn handle_connection(mut stream: TcpStream, con_ctx: &mut ConsoleContext) {
+
+
     let buf_reader = BufReader::new(&mut stream);
     let http_request: Vec<_> = buf_reader
     .lines()

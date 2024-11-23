@@ -21,10 +21,10 @@ impl LogLevel{
 }
 
 pub struct ConsoleContext{
-    content:Vec<String>,
-    header:String,
-    workers_status:Vec<i32>,
-    skin:MadSkin,
+    pub content:Vec<String>,
+    pub header:String,
+    pub workers_status:Vec<i32>,
+    pub skin:MadSkin,
 }
 
 pub fn create_console() -> ConsoleContext{
@@ -45,10 +45,10 @@ pub fn create_console() -> ConsoleContext{
 
 pub fn update_header(ctx: &mut ConsoleContext){
     //0 - green - responded sucessfully
-    //1 - red - threw error/died
+    //1 - red - failed request
     //2 - yellow - processing
     //3 - grey - waiting
-    //4.. - hollow - not supossed to happen
+    //4.. - hollow - dead
 
     let mut bulbs = vec![];
     for i in 0..THREAD_POOL_SIZE {
